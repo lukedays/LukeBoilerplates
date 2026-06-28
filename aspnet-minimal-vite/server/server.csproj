@@ -10,4 +10,11 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
   </ItemGroup>
 
+  <!-- Regenera os tipos do front a cada build (logo, também no dotnet watch e dotnet run).
+       Roda a própria dll com o arg `generate`; não reinvoca o MSBuild, então sem recursão.
+       Só roda se o client existir ao lado (evita quebrar publish isolado). -->
+  <Target Name="GenerateTs" AfterTargets="Build" Condition="Exists('$(MSBuildProjectDirectory)/../client')">
+    <Exec Command="dotnet exec &quot;$(TargetPath)&quot; generate" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
 </Project>
