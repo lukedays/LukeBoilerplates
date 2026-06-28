@@ -1,14 +1,14 @@
+using Microsoft.EntityFrameworkCore;
 using Server.Shared.Codegen;
+using Server.Shared.Data;
 
 namespace Server.Features.Todos;
 
-// DTOs do slice. records -> interfaces no generated.ts.
+// DTOs do slice (contrato da API). records -> interfaces no generated.ts.
 public record TodoDto(int Id, string Title, bool Done);
 
 public record CreateTodoRequest(string Title);
 
-// Feature de exemplo: store em memória só para demonstrar o fluxo de codegen.
-// Numa app real, troque por EF Core / repositório.
 public static class TodosApi
 {
     // Manifesto consumido pelo codegen. Mantenha em sincronia com MapTodos.
@@ -19,27 +19,24 @@ public static class TodosApi
         new("createTodo", "POST", "/api/todos", typeof(CreateTodoRequest), typeof(TodoDto)),
     ];
 
-    private static readonly List<TodoDto> Store =
-    [
-        new(1, "Estudar TanStack Query", true),
-        new(2, "Conectar front ao back", false),
-    ];
-
     public static void MapTodos(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/todos", () => Results.Ok(Store));
+        app.MapGet("/api/todos", async (AppDbContext db) =>
+            await db.Todos
+                .Select(t => new TodoDto(t.Id, t.Title, t.Done))
+                .ToListAsync());
 
-        app.MapGet("/api/todos/{id}", (int id) =>
-            Store.FirstOrDefault(t => t.Id == id) is { } todo
-                ? Results.Ok(todo)
+        app.MapGet("/api/todos/{id}", async (int id, AppDbContext db) =>
+            await db.Todos.FindAsync(id) is { } t
+                ? Results.Ok(new TodoDto(t.Id, t.Title, t.Done))
                 : Results.NotFound());
 
-        app.MapPost("/api/todos", (CreateTodoRequest req) =>
+        app.MapPost("/api/todos", async (CreateTodoRequest req, AppDbContext db) =>
         {
-            var nextId = Store.Count == 0 ? 1 : Store.Max(t => t.Id) + 1;
-            var todo = new TodoDto(nextId, req.Title, false);
-            Store.Add(todo);
-            return Results.Created($"/api/todos/{todo.Id}", todo);
+            var todo = new Todo { Title = req.Title };
+            db.Todos.Add(todo);
+            await db.SaveChangesAsync();
+            return Results.Created($"/api/todos/{todo.Id}", new TodoDto(todo.Id, todo.Title, todo.Done));
         });
     }
 }
