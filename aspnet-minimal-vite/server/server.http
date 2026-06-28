@@ -1,6 +1,18 @@
 @server_HostAddress = http://localhost:5070
 
-GET {{server_HostAddress}}/weatherforecast/
+GET {{server_HostAddress}}/api/todos
 Accept: application/json
+
+###
+
+GET {{server_HostAddress}}/api/todos/1
+Accept: application/json
+
+###
+
+POST {{server_HostAddress}}/api/todos
+Content-Type: application/json
+
+{ "title": "Nova tarefa" }
 
 ###

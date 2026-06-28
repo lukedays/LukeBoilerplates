@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useGetTodos, useCreateTodo } from './api/generated'
-import './App.css'
 
 // Exemplo de consumo dos hooks gerados a partir do backend.
 function App() {
