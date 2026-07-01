@@ -1,13 +1,13 @@
 #if DEBUG
-using Server.Shared.Codegen;
-
 // Faz o codegen rodar também com hot reload ligado (dotnet watch sem rebuild).
 // O runtime chama UpdateApplication após aplicar cada delta de hot reload.
 // Vive no composition root porque conhece a agregação de endpoints das features.
 // Docs: https://learn.microsoft.com/visualstudio/debugger/hot-reload-metadataupdatehandler
-[assembly: System.Reflection.Metadata.MetadataUpdateHandlerAttribute(typeof(Server.HotReloadCodegen))]
+[assembly: System.Reflection.Metadata.MetadataUpdateHandlerAttribute(
+    typeof(Server.Features.Codegen.HotReloadCodegen)
+)]
 
-namespace Server;
+namespace Server.Features.Codegen;
 
 internal static class HotReloadCodegen
 {
@@ -17,8 +17,14 @@ internal static class HotReloadCodegen
     // Regenera client/src/api/generated.ts a cada edição aplicada por hot reload.
     internal static void UpdateApplication(Type[]? updatedTypes)
     {
-        try { TsGenerator.Run(ApiEndpoints.All); }
-        catch (Exception ex) { Console.WriteLine($"[codegen] falhou: {ex.Message}"); }
+        try
+        {
+            TsGenerator.Run(ApiEndpoints.All);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[codegen] falhou: {ex.Message}");
+        }
     }
 }
 #endif

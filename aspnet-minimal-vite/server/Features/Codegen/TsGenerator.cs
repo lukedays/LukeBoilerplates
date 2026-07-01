@@ -3,7 +3,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 
-namespace Server.Shared.Codegen;
+namespace Server.Features.Codegen;
 
 // Descrição tipada de um endpoint. Cada slice expõe a sua lista; o composition
 // root agrega e passa ao gerador.
@@ -12,7 +12,8 @@ public sealed record EndpointDef(
     string Method,
     string Pattern,
     Type? Request,
-    Type Response);
+    Type Response
+);
 
 // Gera client/src/api/generated.ts por reflection nos tipos dos endpoints.
 // Sem OpenAPI: lê os tipos C# direto, então os tipos batem 100%.
@@ -22,16 +23,19 @@ public static class TsGenerator
 
     public static void Run(IReadOnlyList<EndpointDef> endpoints)
     {
-        var objects = new List<Type>();   // records/classes -> interface
-        var enums = new List<Type>();      // enums -> union de string
+        var objects = new List<Type>(); // records/classes -> interface
+        var enums = new List<Type>(); // enums -> union de string
         Collect(endpoints, objects, enums);
 
         var sb = new StringBuilder();
         Header(sb);
-        foreach (var e in enums) EmitEnum(sb, e);
-        foreach (var o in objects) EmitInterface(sb, o);
+        foreach (var e in enums)
+            EmitEnum(sb, e);
+        foreach (var o in objects)
+            EmitInterface(sb, o);
         HttpCore(sb);
-        foreach (var ep in endpoints) EmitHook(sb, ep);
+        foreach (var ep in endpoints)
+            EmitHook(sb, ep);
 
         var outPath = ResolveOutPath();
         Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
@@ -40,22 +44,33 @@ public static class TsGenerator
     }
 
     // --- Coleta de tipos (BFS a partir dos endpoints) ---
-    private static void Collect(IReadOnlyList<EndpointDef> endpoints, List<Type> objects, List<Type> enums)
+    private static void Collect(
+        IReadOnlyList<EndpointDef> endpoints,
+        List<Type> objects,
+        List<Type> enums
+    )
     {
         var seen = new HashSet<Type>();
         var queue = new Queue<Type>();
         foreach (var ep in endpoints)
         {
-            if (ep.Request is not null) queue.Enqueue(ep.Request);
+            if (ep.Request is not null)
+                queue.Enqueue(ep.Request);
             queue.Enqueue(ep.Response);
         }
 
         while (queue.Count > 0)
         {
             var t = Unwrap(queue.Dequeue());
-            if (t is null || !seen.Add(t)) continue;
-            if (t.IsEnum) { enums.Add(t); continue; }
-            if (!IsObject(t)) continue;
+            if (t is null || !seen.Add(t))
+                continue;
+            if (t.IsEnum)
+            {
+                enums.Add(t);
+                continue;
+            }
+            if (!IsObject(t))
+                continue;
 
             objects.Add(t);
             foreach (var p in t.GetProperties(BindingFlags.Public | BindingFlags.Instance))
@@ -66,33 +81,51 @@ public static class TsGenerator
     // Remove Nullable<T>, arrays e IEnumerable<T> até o tipo "folha".
     private static Type? Unwrap(Type t)
     {
-        if (t == typeof(void)) return null;
+        if (t == typeof(void))
+            return null;
         var nn = Nullable.GetUnderlyingType(t);
-        if (nn is not null) return Unwrap(nn);
-        if (t.IsArray) return Unwrap(t.GetElementType()!);
+        if (nn is not null)
+            return Unwrap(nn);
+        if (t.IsArray)
+            return Unwrap(t.GetElementType()!);
         if (t != typeof(string) && typeof(IEnumerable).IsAssignableFrom(t) && t.IsGenericType)
             return Unwrap(t.GetGenericArguments()[0]);
         return t;
     }
 
     private static bool IsObject(Type t) =>
-        t is { IsClass: true, IsPrimitive: false } or { IsValueType: true, IsPrimitive: false, IsEnum: false }
-        && t != typeof(string) && t != typeof(decimal)
-        && t != typeof(DateTime) && t != typeof(DateOnly) && t != typeof(Guid);
+        t
+            is { IsClass: true, IsPrimitive: false }
+                or { IsValueType: true, IsPrimitive: false, IsEnum: false }
+        && t != typeof(string)
+        && t != typeof(decimal)
+        && t != typeof(DateTime)
+        && t != typeof(DateOnly)
+        && t != typeof(Guid);
 
     // --- Mapeamento C# -> TS ---
     private static string TsType(Type t)
     {
         var nn = Nullable.GetUnderlyingType(t);
-        if (nn is not null) return TsType(nn);
-        if (t.IsArray) return TsType(t.GetElementType()!) + "[]";
+        if (nn is not null)
+            return TsType(nn);
+        if (t.IsArray)
+            return TsType(t.GetElementType()!) + "[]";
         if (t != typeof(string) && typeof(IEnumerable).IsAssignableFrom(t) && t.IsGenericType)
             return TsType(t.GetGenericArguments()[0]) + "[]";
-        if (t.IsEnum) return t.Name;
-        if (t == typeof(bool)) return "boolean";
-        if (t == typeof(string) || t == typeof(Guid) || t == typeof(DateTime) || t == typeof(DateOnly))
+        if (t.IsEnum)
+            return t.Name;
+        if (t == typeof(bool))
+            return "boolean";
+        if (
+            t == typeof(string)
+            || t == typeof(Guid)
+            || t == typeof(DateTime)
+            || t == typeof(DateOnly)
+        )
             return "string";
-        if (t.IsPrimitive || t == typeof(decimal)) return "number";
+        if (t.IsPrimitive || t == typeof(decimal))
+            return "number";
         return t.Name; // objeto -> interface
     }
 
@@ -126,14 +159,22 @@ public static class TsGenerator
         var resp = ep.Response == typeof(void) ? "void" : TsType(ep.Response);
         var prms = PathParams(ep.Pattern); // [(name, tsType)]
 
-        if (ep.Method == "GET") EmitQuery(sb, ep, pascal, resp, prms);
-        else EmitMutation(sb, ep, pascal, resp, prms);
+        if (ep.Method == "GET")
+            EmitQuery(sb, ep, pascal, resp, prms);
+        else
+            EmitMutation(sb, ep, pascal, resp, prms);
     }
 
-    private static void EmitQuery(StringBuilder sb, EndpointDef ep, string pascal, string resp,
-        List<(string name, string ts)> prms)
+    private static void EmitQuery(
+        StringBuilder sb,
+        EndpointDef ep,
+        string pascal,
+        string resp,
+        List<(string name, string ts)> prms
+    )
     {
-        var args = prms.Select(p => $"{p.name}: {p.ts}").Append($"options?: Partial<UseQueryOptions<{resp}>>");
+        var args = prms.Select(p => $"{p.name}: {p.ts}")
+            .Append($"options?: Partial<UseQueryOptions<{resp}>>");
         var key = string.Join(", ", new[] { $"\"{ep.Name}\"" }.Concat(prms.Select(p => p.name)));
         var path = ep.Pattern.Replace("{", "${").Replace("}", "}"); // {id} -> ${id}
 
@@ -146,21 +187,29 @@ public static class TsGenerator
         sb.AppendLine("}\n");
     }
 
-    private static void EmitMutation(StringBuilder sb, EndpointDef ep, string pascal, string resp,
-        List<(string name, string ts)> prms)
+    private static void EmitMutation(
+        StringBuilder sb,
+        EndpointDef ep,
+        string pascal,
+        string resp,
+        List<(string name, string ts)> prms
+    )
     {
         var hasBody = ep.Request is not null;
         var req = hasBody ? TsType(ep.Request!) : null;
 
         // Tipo das variables da mutation conforme params/body.
         string vars;
-        string varArg;     // assinatura do mutationFn
-        string bodyArg;    // 3o argumento do http()
+        string varArg; // assinatura do mutationFn
+        string bodyArg; // 3o argumento do http()
         string path = ep.Pattern.Replace("{", "${vars.").Replace("}", "}"); // {id} -> ${vars.id}
 
         if (prms.Count > 0 && hasBody)
         {
-            vars = "{ " + string.Join("; ", prms.Select(p => $"{p.name}: {p.ts}")) + $"; body: {req} }}";
+            vars =
+                "{ "
+                + string.Join("; ", prms.Select(p => $"{p.name}: {p.ts}"))
+                + $"; body: {req} }}";
             varArg = $"vars: {vars}";
             bodyArg = ", vars.body";
         }
@@ -185,10 +234,14 @@ public static class TsGenerator
             path = ep.Pattern;
         }
 
-        sb.AppendLine($"export function use{pascal}(options?: Partial<UseMutationOptions<{resp}, Error, {vars}>>) {{");
+        sb.AppendLine(
+            $"export function use{pascal}(options?: Partial<UseMutationOptions<{resp}, Error, {vars}>>) {{"
+        );
         sb.AppendLine("  const qc = useQueryClient();");
         sb.AppendLine("  return useMutation({");
-        sb.AppendLine($"    mutationFn: ({varArg}) => http<{resp}>(\"{ep.Method}\", `{path}`{bodyArg}),");
+        sb.AppendLine(
+            $"    mutationFn: ({varArg}) => http<{resp}>(\"{ep.Method}\", `{path}`{bodyArg}),"
+        );
         sb.AppendLine("    onSuccess: () => qc.invalidateQueries(),");
         sb.AppendLine("    ...options,");
         sb.AppendLine("  });");
@@ -197,7 +250,8 @@ public static class TsGenerator
 
     // {id} no path -> param tipado. Convenção: id/*Id = number, resto = string.
     private static List<(string, string)> PathParams(string pattern) =>
-        pattern.Split('/')
+        pattern
+            .Split('/')
             .Where(s => s.StartsWith('{') && s.EndsWith('}'))
             .Select(s => s[1..^1])
             .Select(n => (n, n == "id" || n.EndsWith("Id") ? "number" : "string"))
@@ -208,7 +262,9 @@ public static class TsGenerator
 
     private static void Header(StringBuilder sb)
     {
-        sb.AppendLine("// AUTOGERADO por `dotnet run --project server -- generate`. Não editar a mão.");
+        sb.AppendLine(
+            "// AUTOGERADO por `dotnet run --project server -- generate`. Não editar a mão."
+        );
         sb.AppendLine("import {");
         sb.AppendLine("  useQuery,");
         sb.AppendLine("  useMutation,");
@@ -220,11 +276,17 @@ public static class TsGenerator
 
     private static void HttpCore(StringBuilder sb)
     {
-        sb.AppendLine("const BASE_URL = import.meta.env.VITE_API_URL ?? \"http://localhost:5070\";\n");
-        sb.AppendLine("async function http<T>(method: string, path: string, body?: unknown): Promise<T> {");
+        sb.AppendLine(
+            "const BASE_URL = import.meta.env.VITE_API_URL ?? \"http://localhost:5101\";\n"
+        );
+        sb.AppendLine(
+            "async function http<T>(method: string, path: string, body?: unknown): Promise<T> {"
+        );
         sb.AppendLine("  const res = await fetch(BASE_URL + path, {");
         sb.AppendLine("    method,");
-        sb.AppendLine("    headers: body !== undefined ? { \"Content-Type\": \"application/json\" } : undefined,");
+        sb.AppendLine(
+            "    headers: body !== undefined ? { \"Content-Type\": \"application/json\" } : undefined,"
+        );
         sb.AppendLine("    body: body !== undefined ? JSON.stringify(body) : undefined,");
         sb.AppendLine("  });");
         sb.AppendLine("  if (!res.ok) throw new Error(`${method} ${path} -> ${res.status}`);");

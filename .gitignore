@@ -21,8 +21,3 @@ dist/
 
 # Dev
 .dev-logs/
-
-# SQLite
-*.db
-*.db-shm
-*.db-wal

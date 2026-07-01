@@ -17,7 +17,7 @@ export interface CreateTodoRequest {
   title: string;
 }
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5070";
+const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5101";
 
 async function http<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(BASE_URL + path, {

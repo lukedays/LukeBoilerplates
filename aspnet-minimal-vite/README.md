@@ -1,38 +1,35 @@
 # aspnet-minimal-vite
 
-ASP.NET Core minimal API (.NET 10) + EF Core/SQLite + Vite (React + TS), com **tipos e hooks
-do TanStack Query gerados automaticamente do backend** — sem OpenAPI, por reflection direto nos
-tipos C#.
+ASP.NET Core minimal API (.NET 10) + armazenamento em memória + Vite (React + TS + Tailwind),
+com **tipos e hooks do TanStack Query gerados automaticamente do backend** — sem OpenAPI, por
+reflection direto nos tipos C#.
 
 ## Estrutura
 
 ```
 server/                       # backend .NET (minimal API, vertical slices)
   Program.cs                  # composition root + branch `generate` do codegen
-  ApiEndpoints.cs             # agrega o manifesto de cada slice
-  HotReloadCodegen.cs         # regenera o TS no hot reload (dotnet watch)
-  Shared/Codegen/             # o gerador (TsGenerator + EndpointDef)
-  Shared/Data/                # AppDbContext + factory de design-time (EF Core)
-  Migrations/                 # migrations do EF Core (versionadas)
-  Features/<Slice>/           # cada feature: entidade + DTOs + manifesto + map
-client/                       # frontend Vite React+TS
+  Features/Codegen/           # o codegen inteiro: gerador, manifesto agregado e hot reload
+    TsGenerator.cs            #   gerador (TsGenerator + EndpointDef)
+    ApiEndpoints.cs           #   agrega o manifesto de cada slice
+    HotReloadCodegen.cs       #   regenera o TS no hot reload (dotnet watch)
+  Features/<Slice>/           # cada feature de API: modelo + store + DTOs + manifesto + map
+client/                       # frontend Vite React+TS (Tailwind; lint via oxlint, não ESLint)
   src/api/generated.ts        # AUTOGERADO — não editar à mão
 dev.ps1                       # sobe API + Vite lado a lado
 ```
 
-## Persistência (EF Core + SQLite)
+## Armazenamento (em memória)
 
-- `Shared/Data/AppDbContext.cs` — contexto único; cada feature com persistência adiciona o seu
-  `DbSet`. A entidade vive na feature (ex.: `Features/Todos/Todo.cs`), separada do DTO da API.
-- Connection string em `appsettings.json` (`Data Source=app.db`). O `app.db` não é versionado.
-- No startup, `db.Database.Migrate()` cria/atualiza o banco e popula se estiver vazio.
-- Mudou alguma entidade? Gere a migration:
-
-```sh
-dotnet ef migrations add <Nome> --project server
-```
+- Sem banco: cada feature com estado expõe um store em memória registrado como singleton
+  (ex.: `Features/Todos/TodoStore.cs`, um `ConcurrentDictionary` thread-safe).
+- O modelo de armazenamento vive na feature (ex.: `Features/Todos/Todo.cs`), separado do DTO
+  da API. O seed inicial roda no construtor do store.
+- O estado dura enquanto o processo roda; reiniciar zera e re-semeia.
 
 ## Como funciona o codegen
+
+Todo o codegen vive em `server/Features/Codegen/`.
 
 1. Cada slice expõe `static IReadOnlyList<EndpointDef> Endpoints` — o **manifesto** (nome do
    hook, método, rota, tipo do request e do response).
@@ -49,9 +46,10 @@ Como lê os tipos C# direto, o TS bate 100% com o JSON real (mesma política cam
 
 1. Crie `server/Features/<Slice>/<Slice>Endpoints.cs` com os DTOs, a lista `Endpoints` e o
    `Map<Slice>(this IEndpointRouteBuilder)`. Mantenha o manifesto em sincronia com o map.
-2. Inclua `<Slice>Api.Endpoints` em `server/ApiEndpoints.cs` e `app.Map<Slice>()` em `Program.cs`.
-3. Se a feature persiste dados: crie a entidade, adicione o `DbSet` em `AppDbContext` e gere a
-   migration (`dotnet ef migrations add ...`).
+2. Se a feature guarda estado, crie um `<Slice>Store` em memória e registre com
+   `builder.Services.AddSingleton<<Slice>Store>()` no `Program.cs`.
+3. Inclua `<Slice>Api.Endpoints` em `Features/Codegen/ApiEndpoints.cs` e `app.Map<Slice>()`
+   em `Program.cs`.
 4. Os hooks aparecem em `generated.ts` no próximo build / hot reload.
 
 ## Como rodar
@@ -61,5 +59,15 @@ Como lê os tipos C# direto, o TS bate 100% com o JSON real (mesma política cam
 ./dev.ps1 -Mode Background   # ambos em background; logs em .dev-logs/. Pare com -Mode Stop
 ```
 
-API em `http://localhost:5070`, front em `http://localhost:5173`. Sobrescreva a base da API
+API em `http://localhost:5101`, front em `http://localhost:5100`. Sobrescreva a base da API
 no front via `VITE_API_URL`.
+
+## Formatação
+
+```sh
+./format.ps1              # backend com CSharpier, frontend com Prettier
+```
+
+O CSharpier é tool local (`dotnet-tools.json`); o `format.ps1` faz `dotnet tool restore` antes.
+
+Os comandos exatos de regeneração via CLI ficam em `REGEN.md`.

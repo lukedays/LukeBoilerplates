@@ -1,6 +1,6 @@
 namespace Server.Features.Todos;
 
-// Entidade persistida (EF Core). Separada do TodoDto, que é o contrato da API.
+// Modelo de armazenamento (em memória). Separado do TodoDto, que é o contrato da API.
 public class Todo
 {
     public int Id { get; set; }
